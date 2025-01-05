@@ -42,6 +42,18 @@ var iamSetupCmd = &cobra.Command{
         if err != nil {
             log.Fatalf("Error retrieving external-id flag: %v", err)
         }
+        workspace, err := cmd.Flags().GetString("workspace")
+        if err != nil {
+            log.Fatalf("Error retrieving workspace flag: %v", err)
+        }
+        workergroup, err := cmd.Flags().GetString("workergroup")
+        if err != nil {
+            log.Fatalf("Error retrieving workergroup flag: %v", err)
+        }
+        action, err := cmd.Flags().GetString("action")
+        if err != nil {
+            log.Fatalf("Error retrieving action flag: %v", err)
+        }
         bucketNames, err := cmd.Flags().GetStringSlice("bucket")
         if err != nil {
             log.Fatalf("Error retrieving bucket flag: %v", err)
@@ -69,7 +81,7 @@ var iamSetupCmd = &cobra.Command{
         iamClient := iam.NewIAMClient(cfg)
 
         // Setup Trust Relationship and Policies
-        err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID, bucketNames)
+        err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID, workspace, workergroup, action, bucketNames)
         if err != nil {
             log.Fatalf("Error setting up IAM trust relationship: %v", err)
         }
@@ -83,9 +95,12 @@ func init() {
     iamSetupCmd.Flags().StringP("role", "r", "CrossAccountAccessRole", "Name of the IAM role to create or update")
     iamSetupCmd.Flags().StringP("account", "a", "", "AWS Account ID to trust (required)")
     iamSetupCmd.Flags().StringP("external-id", "e", "", "External ID for the trust relationship (optional)")
+    iamSetupCmd.Flags().StringP("workspace", "w", "main", "Workspace name (default: main)")
+    iamSetupCmd.Flags().StringP("workergroup", "g", "default", "Worker group name (default: default)")
+    iamSetupCmd.Flags().StringP("action", "s", "search", "Action type for the IAM role (default: search)")
     iamSetupCmd.Flags().StringSliceP("bucket", "b", []string{}, "Name of the S3 bucket to grant access (can specify multiple)")
     iamSetupCmd.Flags().StringP("profile", "p", "", "AWS profile to use for authentication (optional)")
-    iamSetupCmd.Flags().StringP("region", "g", "", "AWS region to target (optional)")
+    iamSetupCmd.Flags().StringP("region", "z", "", "AWS region to target (optional)")
 
     // Mark required flags
     iamSetupCmd.MarkFlagRequired("account")

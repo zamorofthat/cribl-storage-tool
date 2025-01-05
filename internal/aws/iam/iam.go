@@ -26,7 +26,7 @@ func NewIAMClient(cfg aws.Config) *IAMClient {
 
 // SetupTrustRelationship creates or updates an IAM role with a trust relationship and attaches necessary policies
 func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalID string, workspace string,
-    workergroup string, action string,  bucketNames []string) error {
+    workergroup string, action string, bucketNames []string) error {
     // Validate input parameters
     if roleName == "" {
         return fmt.Errorf("roleName cannot be empty")
@@ -34,35 +34,39 @@ func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalI
     if trustedAccountID == "" {
         return fmt.Errorf("trustedAccountID cannot be empty")
     }
+    if workspace == "" {
+        workspace = "main" // Assign default value if empty
+    }
+    if workergroup == "" {
+        workergroup = "default" // Assign default value if empty
+    }
     if len(bucketNames) == 0 {
         return fmt.Errorf("at least one bucketName must be provided")
     }
-    if workergroup == "" && action != "search" {
-        workergroup := "default"
-    }
-    if workspace == "" && action != "search" {
-        workspace := "main"
-    }
 
+    var trustPolicy string
+
+    // Determine trust policy based on action
     if action != "search" {
-    // Define trust relationship policy
-    trustPolicy := fmt.Sprintf(`{
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Allow",
-            "Principal": { "AWS": "arn:aws:iam::%s:role/%s-%s" },
-            "Action": ["sts:AssumeRole","sts:TagSession","sts:SetSourceIdentity"],
-            "Condition": {
-                "StringEquals": { "sts:ExternalId": "%s" }
-            }
-        }]
-    }`, trustedAccountID, workspace, workergroup, externalID)
-    } else {
-        trustPolicy := fmt.Sprintf(`{
+        // Define trust relationship policy for non-search actions
+        trustPolicy = fmt.Sprintf(`{
             "Version": "2012-10-17",
             "Statement": [{
                 "Effect": "Allow",
-                "Principal": { "AWS": "arn:aws:iam::%s:role/search-exec-*" },
+                "Principal": { "AWS": "arn:aws:iam::%s:role/%s-%s" },
+                "Action": ["sts:AssumeRole","sts:TagSession","sts:SetSourceIdentity"],
+                "Condition": {
+                    "StringEquals": { "sts:ExternalId": "%s" }
+                }
+            }]
+        }`, trustedAccountID, workspace, workergroup, externalID)
+    } else {
+        // Define trust relationship policy for search action
+        trustPolicy = fmt.Sprintf(`{
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "AWS": "arn:aws:iam::%s:role/search-exec-main" },
                 "Action": ["sts:AssumeRole","sts:TagSession","sts:SetSourceIdentity"],
                 "Condition": {
                     "StringEquals": { "sts:ExternalId": "%s" }
@@ -70,7 +74,6 @@ func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalI
             }]
         }`, trustedAccountID, externalID)
     }
-
 
     // Check if the role exists
     _, err := c.Client.GetRole(context.TODO(), &iam.GetRoleInput{
