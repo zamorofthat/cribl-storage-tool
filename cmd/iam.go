@@ -2,7 +2,9 @@
 package cmd
 
 import (
+    "encoding/json"
     "fmt"
+    "io/ioutil"
     "log"
 
     "github.com/spf13/cobra"
@@ -58,6 +60,10 @@ var iamSetupCmd = &cobra.Command{
         if err != nil {
             log.Fatalf("Error retrieving bucket flag: %v", err)
         }
+        bucketFile, err := cmd.Flags().GetString("bucket-file")
+        if err != nil {
+            log.Fatalf("Error retrieving bucket-file flag: %v", err)
+        }
         profile, err := cmd.Flags().GetString("profile")
         if err != nil {
             log.Fatalf("Error retrieving profile flag: %v", err)
@@ -67,8 +73,25 @@ var iamSetupCmd = &cobra.Command{
             log.Fatalf("Error retrieving region flag: %v", err)
         }
 
+        // Handle bucket-file if provided
+        if bucketFile != "" {
+            data, err := ioutil.ReadFile(bucketFile)
+            if err != nil {
+                log.Fatalf("Error reading bucket file: %v", err)
+            }
+
+            var fileBuckets []string
+            err = json.Unmarshal(data, &fileBuckets)
+            if err != nil {
+                log.Fatalf("Error parsing JSON bucket file: %v", err)
+            }
+
+            bucketNames = append(bucketNames, fileBuckets...)
+        }
+
+        // Enforce that at least one of --bucket or --bucket-file is provided
         if len(bucketNames) == 0 {
-            log.Fatalf("At least one bucket name must be provided using the --bucket flag.")
+            log.Fatalf("At least one bucket name must be provided using the --bucket flag or --bucket-file flag.")
         }
 
         // Load AWS configuration
@@ -99,10 +122,11 @@ func init() {
     iamSetupCmd.Flags().StringP("workergroup", "g", "default", "Worker group name (default: default)")
     iamSetupCmd.Flags().StringP("action", "s", "search", "Action type for the IAM role (default: search)")
     iamSetupCmd.Flags().StringSliceP("bucket", "b", []string{}, "Name of the S3 bucket to grant access (can specify multiple)")
+    iamSetupCmd.Flags().StringP("bucket-file", "f", "", "Path to JSON file containing S3 bucket names (optional)")
     iamSetupCmd.Flags().StringP("profile", "p", "", "AWS profile to use for authentication (optional)")
     iamSetupCmd.Flags().StringP("region", "z", "", "AWS region to target (optional)")
 
     // Mark required flags
     iamSetupCmd.MarkFlagRequired("account")
-    iamSetupCmd.MarkFlagRequired("bucket")
+    // iamSetupCmd.MarkFlagRequired("bucket") // Removed to allow --bucket-file usage
 }
