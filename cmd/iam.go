@@ -5,7 +5,6 @@ import (
     "fmt"
     "log"
 
-    // "github.com/aws/aws-sdk-go-v2/config"
     "github.com/spf13/cobra"
 
     "github.com/zamorofthat/cribl-storage-tool/internal/aws/iam"
@@ -43,8 +42,10 @@ var iamSetupCmd = &cobra.Command{
         if err != nil {
             log.Fatalf("Error retrieving external-id flag: %v", err)
         }
-
-        // Load AWS configuration
+        bucketNames, err := cmd.Flags().GetStringSlice("bucket")
+        if err != nil {
+            log.Fatalf("Error retrieving bucket flag: %v", err)
+        }
         profile, err := cmd.Flags().GetString("profile")
         if err != nil {
             log.Fatalf("Error retrieving profile flag: %v", err)
@@ -54,6 +55,11 @@ var iamSetupCmd = &cobra.Command{
             log.Fatalf("Error retrieving region flag: %v", err)
         }
 
+        if len(bucketNames) == 0 {
+            log.Fatalf("At least one bucket name must be provided using the --bucket flag.")
+        }
+
+        // Load AWS configuration
         cfg, err := utils.LoadAWSConfig(profile, region)
         if err != nil {
             log.Fatalf("Unable to load AWS SDK config, %v", err)
@@ -62,8 +68,8 @@ var iamSetupCmd = &cobra.Command{
         // Initialize IAM client
         iamClient := iam.NewIAMClient(cfg)
 
-        // Setup Trust Relationship
-        err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID)
+        // Setup Trust Relationship and Policies
+        err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID, bucketNames)
         if err != nil {
             log.Fatalf("Error setting up IAM trust relationship: %v", err)
         }
@@ -77,5 +83,11 @@ func init() {
     iamSetupCmd.Flags().StringP("role", "r", "CrossAccountAccessRole", "Name of the IAM role to create or update")
     iamSetupCmd.Flags().StringP("account", "a", "", "AWS Account ID to trust (required)")
     iamSetupCmd.Flags().StringP("external-id", "e", "", "External ID for the trust relationship (optional)")
+    iamSetupCmd.Flags().StringSliceP("bucket", "b", []string{}, "Name of the S3 bucket to grant access (can specify multiple)")
+    iamSetupCmd.Flags().StringP("profile", "p", "", "AWS profile to use for authentication (optional)")
+    iamSetupCmd.Flags().StringP("region", "g", "", "AWS region to target (optional)")
+
+    // Mark required flags
     iamSetupCmd.MarkFlagRequired("account")
+    iamSetupCmd.MarkFlagRequired("bucket")
 }
