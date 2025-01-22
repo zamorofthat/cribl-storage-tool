@@ -5,6 +5,7 @@ import (
     "context"
     "errors"
     "fmt"
+    "strings"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/service/iam"
@@ -24,19 +25,55 @@ func NewIAMClient(cfg aws.Config) *IAMClient {
 }
 
 // SetupTrustRelationship creates or updates an IAM role with a trust relationship and attaches necessary policies
-func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalID string) error {
-    // Define trust relationship policy
-    trustPolicy := fmt.Sprintf(`{
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Allow",
-            "Principal": { "AWS": "arn:aws:iam::%s:root" },
-            "Action": "sts:AssumeRole",
-            "Condition": {
-                "StringEquals": { "sts:ExternalId": "%s" }
-            }
-        }]
-    }`, trustedAccountID, externalID)
+func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalID string, workspace string,
+    workergroup string, action string, bucketNames []string) error {
+    // Validate input parameters
+    if roleName == "" {
+        return fmt.Errorf("roleName cannot be empty")
+    }
+    if trustedAccountID == "" {
+        return fmt.Errorf("trustedAccountID cannot be empty")
+    }
+    if workspace == "" {
+        workspace = "main" // Assign default value if empty
+    }
+    if workergroup == "" {
+        workergroup = "default" // Assign default value if empty
+    }
+    if len(bucketNames) == 0 {
+        return fmt.Errorf("at least one bucketName must be provided")
+    }
+
+    var trustPolicy string
+
+    // Determine trust policy based on action
+    if action != "search" {
+        // Define trust relationship policy for non-search actions
+        trustPolicy = fmt.Sprintf(`{
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "AWS": "arn:aws:iam::%s:role/%s-%s" },
+                "Action": ["sts:AssumeRole","sts:TagSession","sts:SetSourceIdentity"],
+                "Condition": {
+                    "StringEquals": { "sts:ExternalId": "%s" }
+                }
+            }]
+        }`, trustedAccountID, workspace, workergroup, externalID)
+    } else {
+        // Define trust relationship policy for search action
+        trustPolicy = fmt.Sprintf(`{
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "AWS": "arn:aws:iam::%s:role/search-exec-main" },
+                "Action": ["sts:AssumeRole","sts:TagSession","sts:SetSourceIdentity"],
+                "Condition": {
+                    "StringEquals": { "sts:ExternalId": "%s" }
+                }
+            }]
+        }`, trustedAccountID, externalID)
+    }
 
     // Check if the role exists
     _, err := c.Client.GetRole(context.TODO(), &iam.GetRoleInput{
@@ -76,7 +113,13 @@ func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalI
 
     policyName := "CrossAccountAccessPolicy"
 
-    // Define the policy document
+    // Define the policy document with the provided bucket names
+    // Generate ARN strings for each bucket
+    var bucketArns []string
+    for _, bucket := range bucketNames {
+        bucketArns = append(bucketArns, fmt.Sprintf("\"arn:aws:s3:::%s\"", bucket))
+        bucketArns = append(bucketArns, fmt.Sprintf("\"arn:aws:s3:::%s/*\"", bucket))
+    }
     policyDocument := fmt.Sprintf(`{
         "Version": "2012-10-17",
         "Statement": [{
@@ -84,14 +127,12 @@ func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalI
             "Action": [
                 "s3:ListBucket",
                 "s3:GetObject",
-                "s3:PutObject"
+                "s3:PutObject",
+                "s3:GetBucketLocation"
             ],
-            "Resource": [
-                "arn:aws:s3:::%s",
-                "arn:aws:s3:::%s/*"
-            ]
+            "Resource": [%s]
         }]
-    }`, "your-s3-bucket-name", "your-s3-bucket-name") // Replace with actual bucket names
+    }`, strings.Join(bucketArns, ", "))
 
     // Attach the policy to the role
     _, err = c.Client.PutRolePolicy(context.TODO(), &iam.PutRolePolicyInput{

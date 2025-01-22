@@ -2,10 +2,11 @@
 package cmd
 
 import (
+    "encoding/json"
     "fmt"
+    "io/ioutil"
     "log"
 
-    // "github.com/aws/aws-sdk-go-v2/config"
     "github.com/spf13/cobra"
 
     "github.com/zamorofthat/cribl-storage-tool/internal/aws/iam"
@@ -43,8 +44,26 @@ var iamSetupCmd = &cobra.Command{
         if err != nil {
             log.Fatalf("Error retrieving external-id flag: %v", err)
         }
-
-        // Load AWS configuration
+        workspace, err := cmd.Flags().GetString("workspace")
+        if err != nil {
+            log.Fatalf("Error retrieving workspace flag: %v", err)
+        }
+        workergroup, err := cmd.Flags().GetString("workergroup")
+        if err != nil {
+            log.Fatalf("Error retrieving workergroup flag: %v", err)
+        }
+        action, err := cmd.Flags().GetString("action")
+        if err != nil {
+            log.Fatalf("Error retrieving action flag: %v", err)
+        }
+        bucketNames, err := cmd.Flags().GetStringSlice("bucket")
+        if err != nil {
+            log.Fatalf("Error retrieving bucket flag: %v", err)
+        }
+        bucketFile, err := cmd.Flags().GetString("bucket-file")
+        if err != nil {
+            log.Fatalf("Error retrieving bucket-file flag: %v", err)
+        }
         profile, err := cmd.Flags().GetString("profile")
         if err != nil {
             log.Fatalf("Error retrieving profile flag: %v", err)
@@ -54,6 +73,28 @@ var iamSetupCmd = &cobra.Command{
             log.Fatalf("Error retrieving region flag: %v", err)
         }
 
+        // Handle bucket-file if provided
+        if bucketFile != "" {
+            data, err := ioutil.ReadFile(bucketFile)
+            if err != nil {
+                log.Fatalf("Error reading bucket file: %v", err)
+            }
+
+            var fileBuckets []string
+            err = json.Unmarshal(data, &fileBuckets)
+            if err != nil {
+                log.Fatalf("Error parsing JSON bucket file: %v", err)
+            }
+
+            bucketNames = append(bucketNames, fileBuckets...)
+        }
+
+        // Enforce that at least one of --bucket or --bucket-file is provided
+        if len(bucketNames) == 0 {
+            log.Fatalf("At least one bucket name must be provided using the --bucket flag or --bucket-file flag.")
+        }
+
+        // Load AWS configuration
         cfg, err := utils.LoadAWSConfig(profile, region)
         if err != nil {
             log.Fatalf("Unable to load AWS SDK config, %v", err)
@@ -62,8 +103,8 @@ var iamSetupCmd = &cobra.Command{
         // Initialize IAM client
         iamClient := iam.NewIAMClient(cfg)
 
-        // Setup Trust Relationship
-        err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID)
+        // Setup Trust Relationship and Policies
+        err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID, workspace, workergroup, action, bucketNames)
         if err != nil {
             log.Fatalf("Error setting up IAM trust relationship: %v", err)
         }
@@ -77,5 +118,15 @@ func init() {
     iamSetupCmd.Flags().StringP("role", "r", "CrossAccountAccessRole", "Name of the IAM role to create or update")
     iamSetupCmd.Flags().StringP("account", "a", "", "AWS Account ID to trust (required)")
     iamSetupCmd.Flags().StringP("external-id", "e", "", "External ID for the trust relationship (optional)")
+    iamSetupCmd.Flags().StringP("workspace", "w", "main", "Workspace name (default: main)")
+    iamSetupCmd.Flags().StringP("workergroup", "g", "default", "Worker group name (default: default)")
+    iamSetupCmd.Flags().StringP("action", "s", "search", "Action type for the IAM role (default: search)")
+    iamSetupCmd.Flags().StringSliceP("bucket", "b", []string{}, "Name of the S3 bucket to grant access (can specify multiple)")
+    iamSetupCmd.Flags().StringP("bucket-file", "f", "", "Path to JSON file containing S3 bucket names (optional)")
+    iamSetupCmd.Flags().StringP("profile", "p", "", "AWS profile to use for authentication (optional)")
+    iamSetupCmd.Flags().StringP("region", "z", "", "AWS region to target (optional)")
+
+    // Mark required flags
     iamSetupCmd.MarkFlagRequired("account")
+    // iamSetupCmd.MarkFlagRequired("bucket") // Removed to allow --bucket-file usage
 }
