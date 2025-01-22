@@ -127,7 +127,8 @@ func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalI
             "Action": [
                 "s3:ListBucket",
                 "s3:GetObject",
-                "s3:PutObject"
+                "s3:PutObject",
+                "s3:GetBucketLocation"
             ],
             "Resource": [%s]
         }]
