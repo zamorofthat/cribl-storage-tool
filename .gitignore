@@ -5,3 +5,7 @@
 *.so
 *.dylib
 cribl-storage-tool
+*.idea
+*.xml
+*.iml
+*.DS_Store
