@@ -49,6 +49,11 @@ type Condition struct {
 }
 
 func NewIAMClient(cfg aws.Config, logger zerolog.Logger) *IAMClient {
+	// Log the region from the AWS config
+	logger.Info().
+		Str("aws_region", cfg.Region).
+		Msg("Initializing IAM client with AWS config")
+
 	return &IAMClient{
 		Client: iam.NewFromConfig(cfg),
 		logger: logger.With().Str("component", "iam_client").Logger(),
@@ -66,7 +71,10 @@ func (c *IAMClient) SetupTrustRelationship(roleName, trustedAccountID, externalI
 		Strs("bucket_names", bucketNames).
 		Logger()
 
-	logger.Info().Msg("setting up trust relationship")
+	// Log the AWS region being used by the IAM client
+	logger.Info().
+		Str("aws_region", c.Client.Options().Region).
+		Msg("setting up trust relationship with AWS region")
 
 	if err := c.validateInputs(roleName, trustedAccountID, workspace, workergroup, bucketNames); err != nil {
 		logger.Error().Err(err).Msg("input validation failed")
