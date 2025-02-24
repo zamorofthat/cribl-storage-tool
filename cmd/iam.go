@@ -10,8 +10,9 @@ import (
     "github.com/rs/zerolog"
     "github.com/spf13/cobra"
 
-    "github.com/zamorofthat/cribl-storage-tool/internal/aws/iam"
-    "github.com/zamorofthat/cribl-storage-tool/internal/utils"
+    criblawshelper "github.com/zamorofthat/cribl-storage-tool/pkg/aws"
+    "github.com/zamorofthat/cribl-storage-tool/pkg/utils"
+//     "github.com/zamorofthat/cribl-storage-tool/internal/utils"
 )
 
 var iamCmd = &cobra.Command{
@@ -167,7 +168,7 @@ var iamSetupCmd = &cobra.Command{
         }
 
         // Initialize IAM client with logger
-        iamClient := iam.NewIAMClient(cfg, logger)
+        iamClient := criblawshelper.NewIAMClient(cfg, logger)
 
         // Setup Trust Relationship and Policies
         err = iamClient.SetupTrustRelationship(roleName, trustedAccountID, externalID, workspace, workergroup, action, bucketNames)
