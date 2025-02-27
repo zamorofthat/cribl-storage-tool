@@ -1,4 +1,4 @@
-// internal/utils/aws.go
+// pkg/utils/utils.go
 package utils
 
 import (

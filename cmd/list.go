@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/zamorofthat/cribl-storage-tool/internal/aws/s3"
+	criblawshelper "github.com/zamorofthat/cribl-storage-tool/pkg/aws"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"context" // Ensure this line is present
@@ -69,7 +69,7 @@ var listCmd = &cobra.Command{
 		}
 
 		// Initialize S3 client
-		s3Client := s3.NewS3Client(cfg)
+		s3Client := criblawshelper.NewS3Client(cfg)
 
 		// Retrieve the list of buckets
 		buckets, err := s3Client.ListBuckets()
@@ -89,7 +89,7 @@ var listCmd = &cobra.Command{
 
 		// Apply substring filter if provided
 		if filter != "" {
-			var filteredBuckets []s3.Bucket
+			var filteredBuckets []criblawshelper.Bucket
 			for _, bucket := range buckets {
 				if strings.Contains(bucket.Name, filter) {
 					filteredBuckets = append(filteredBuckets, bucket)
@@ -104,7 +104,7 @@ var listCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Invalid regex pattern: %v", err)
 			}
-			var regexFilteredBuckets []s3.Bucket
+			var regexFilteredBuckets []criblawshelper.Bucket
 			for _, bucket := range buckets {
 				if compiledRegex.MatchString(bucket.Name) {
 					regexFilteredBuckets = append(regexFilteredBuckets, bucket)
@@ -114,17 +114,19 @@ var listCmd = &cobra.Command{
 		}
 
 		// Format and print the output
-		switch outputFormat {
-		case "json":
-			err = s3Client.PrintBucketsJSON(buckets)
-			if err != nil {
-				log.Fatalf("Error printing buckets in JSON format: %v", err)
-			}
-		case "text":
-			fallthrough
-		default:
-			s3Client.PrintBucketsText(buckets)
-		}
+        switch outputFormat {
+        case "json":
+            err = s3Client.PrintBucketsJSON(buckets)
+            if err != nil {
+                log.Fatalf("Error printing buckets in JSON format: %v", err)
+            }
+        case "names":
+            s3Client.PrintBucketsNameOnly(buckets)
+        case "text":
+            fallthrough
+        default:
+            s3Client.PrintBucketsText(buckets)
+        }
 	},
 }
 
@@ -147,7 +149,7 @@ func loadAWSConfig(profile, region string) (aws.Config, error) {
 }
 
 // loadBucketsFromFile reads a JSON file containing a list of bucket names
-func loadBucketsFromFile(filePath string) ([]s3.Bucket, error) {
+func loadBucketsFromFile(filePath string) ([]criblawshelper.Bucket, error) {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, err
@@ -159,16 +161,16 @@ func loadBucketsFromFile(filePath string) ([]s3.Bucket, error) {
 		return nil, err
 	}
 
-	var buckets []s3.Bucket
+	var buckets []criblawshelper.Bucket
 	for _, name := range bucketNames {
-		buckets = append(buckets, s3.Bucket{Name: name})
+		buckets = append(buckets, criblawshelper.Bucket{Name: name})
 	}
 	return buckets, nil
 }
 
 func init() {
 	// Define flags specific to the list command
-	listCmd.Flags().StringP("output", "o", "text", "Output format: text or json")
+    listCmd.Flags().StringP("output", "o", "text", "Output format: text, json, or names")
 	listCmd.Flags().StringP("profile", "p", "", "AWS profile to use for authentication (optional)")
 	listCmd.Flags().StringP("region", "r", "", "AWS region to target (optional)")
 	listCmd.Flags().StringP("filter", "f", "", "Filter bucket names containing the specified substring (optional)")

@@ -1,4 +1,5 @@
-package iam
+package aws
+// pkg/aws/iam.go
 
 import (
 	"context"
