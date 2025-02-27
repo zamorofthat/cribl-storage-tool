@@ -175,5 +175,5 @@ func init() {
 	listCmd.Flags().StringP("region", "r", "", "AWS region to target (optional)")
 	listCmd.Flags().StringP("filter", "f", "", "Filter bucket names containing the specified substring (optional)")
 	listCmd.Flags().StringP("regex", "x", "", "Filter bucket names matching the specified regular expression (optional)")
-	listCmd.Flags().StringP("bucket-file", "b", "", "Path to JSON file containing S3 bucket names (optional)")
+	listCmd.Flags().StringP("bucket-file", "b", "", "Path to file containing S3 bucket names (optional)")
 }
