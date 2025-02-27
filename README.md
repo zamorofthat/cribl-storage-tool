@@ -9,6 +9,9 @@ A command-line tool for managing data across diverse storage solutions. As data 
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
+   - [S3 List Command](#s3-list-command)
+   - [IAM Setup Command](#iam-setup-command)
+- [Examples](#examples)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
 - [License](#license)
@@ -41,7 +44,7 @@ Clone the repository and install the necessary dependencies:
 The tool is divided into multiple commands for interacting with different storage components. Below are examples for the two primary commands: listing S3 buckets and setting up IAM roles.
 
  - S3 List Command
-```./cribl-storage-tool s3 list [flags]```
+```./cribl-storage-tool s3 list -h```
    - ```aiignore
       Usage:
       cribl-storage-tool s3 list [flags]
@@ -54,17 +57,30 @@ The tool is divided into multiple commands for interacting with different storag
       -p, --profile string       AWS profile to use for authentication (optional)
       -x, --regex string         Filter bucket names matching the specified regular expression (optional)
       -r, --region string        AWS region to target (optional)
+   ```
+ - IAM Setup Command Search it
+   ```/cribl-storage-tool iam setup -h```
+ - ```Usage:
+   cribl-storage-tool iam setup [flags]
+   
+   Flags:
+   -a, --account string            AWS Account ID to trust (required if --cribl-worker-arn not provided)
+   -s, --action string             Action type for the IAM role (default: search) (default "search")
+   -b, --bucket strings            Name of the S3 bucket to grant access (can specify multiple)
+   -f, --bucket-file string        Path to JSON file containing S3 bucket names (optional)
+   --cribl-worker-arn string   Cribl worker ARN (e.g., arn:aws:iam::ACCOUNT:role/WORKSPACE-WORKERGROUP)
+   -e, --external-id string        External ID for the trust relationship (optional)
+   -h, --help                      help for setup
+   -p, --profile string            AWS profile to use for authentication (optional)
+   -z, --region string             AWS region to target (optional)
+   -r, --role string               Name of the IAM role to create or update (default "CrossAccountAccessRole")
+   -g, --workergroup string        Worker group name (default: default) (default "default")
+   -w, --workspace string          Workspace name (default: main) (default "main")
+   ```
+## Examples:
+Lets go ahead and use my power account goatshipansible to list all the s3 buckets
+```./cribl-storage-tool s3 list --profile goatshipansible```
 ```
-```
-The s3 list command helps you retrieve a list of S3 buckets (or objects) based on various filters and output formats.
-```bash
-git clone https://github.com/yourusername/cribl-storage-tool.git
-cd cribl-storage-tool
-# Follow further installation instructions specific to your environment
-./cribl-storage-tool s3 list --profile goatshipansible
-```aiignore
-azamora@29JH7X-luQT cribl-storage-tool % ./cribl-storage-tool s3 list --profile goatshipansible
-
 Listing S3 Buckets:
  - aws-cloudtrail-logs-55555-55555
  - aws-security-data-lake-us-east-1-55555
@@ -81,9 +97,25 @@ Listing S3 Buckets:
  - seclake-customsource
 
 ```
+Now that i have all my buckets listed i want to be able to search on Cribl Search for the buckets badcoffee and ckoamplifybucket
+for account we will be using the cribl account trust relationship if you have that handy. In this case for my tenant: `47111295931415`
+the workspace i'm going to link the bucket to is -w `contractors` .
+
+Since I like pi im going to specify my external-id with the flag -e `31415` + the role name -r `elbcoffeee` here is the completed command for badcoffee bucket:
+
+```./cribl-storage-tool iam setup --account 471112959014 --profile goatshipansible --bucket badcoffee -e 314515 -r elbcoffee --workspace contractors ```
+
+you will see a stream of logs and if successful `{"level":"info","command":"iam_setup","time":"2025-02-27T13:48:26-05:00","message":"IAM trust relationship setup completed successfully"}`
+
+Speaking of stream lets go ahead and edit the command for stream to send data to the bucket from Stream:
+```./cribl-storage-tool iam setup --account 471112959014 --profile goatshipansible --bucket badcoffee -e 314515 -r elbcoffee --workspace contractors --workergroup default --action send```
+
+- Using the filter || regex
+```
+```
 ./cribl-storage-tool s3 list --profile goatshipansible --filter lake
 ```aiignore
-azamora@29JH7X-luQT cribl-storage-tool % ./cribl-storage-tool s3 list --profile goatshipansible --filter lake
+zamorofthat@29JH7X-pi cribl-storage-tool % ./cribl-storage-tool s3 list --profile goatshipansible --filter lake
 
 Listing S3 Buckets:
  - aws-security-data-lake-us-east-1-55555
@@ -96,7 +128,7 @@ Listing S3 Buckets:
 
 ./cribl-storage-tool s3 list --profile goatshipansible --regex "lake.*"\
 ```aiignore
-azamora@29JH7X-luQT cribl-storage-tool % ./cribl-storage-tool s3 list --profile goatshipansible --regex "lake.*"
+zamorofthat@29JH7X-pi cribl-storage-tool % ./cribl-storage-tool s3 list --profile goatshipansible --regex "lake.*"
 
 Listing S3 Buckets:
  - aws-security-data-lake-us-east-1-55555
@@ -104,12 +136,4 @@ Listing S3 Buckets:
  - aws-security-data-lake-us-west-1-55555
  - aws-security-data-lake-us-west-2-55555
  - seclake-customsource
-477358655677 
-```
-./cribl-storage-tool iam setup --account 47731415 --profile criblcoffee --region us-east-1 --bucket badcoffee -e 314515 -r elbcoffee --workspace keynote
-```aiignore
-{"level":"info","command":"iam_setup","component":"iam_client","role_name":"elbcoffee","trusted_account_id":"477358655677","workspace":"keynote","workergroup":"default","action":"search","bucket_names":["badcoffee"],"time":"2025-02-19T18:21:56-05:00","message":"setting up trust relationship"}
-{"level":"debug","command":"iam_setup","component":"iam_client","role_name":"elbcoffee","trusted_account_id":"477358655677","workspace":"keynote","workergroup":"default","bucket_names":["badcoffee"],"time":"2025-02-19T18:21:56-05:00","message":"validating inputs"}
-{"level":"debug","command":"iam_setup","component":"iam_client","role_name":"elbcoffee","trusted_account_id":"477358655677","workspace":"keynote","workergroup":"default","bucket_names":["badcoffee"],"time":"2025-02-19T18:21:56-05:00","message":"input validation successful"}
-
 ```
