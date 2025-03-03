@@ -71,7 +71,7 @@ jobs:
           echo "Build process completed!"
 
       - name: Upload build artifacts to GitHub
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cribl-storage-tool-binaries
           path: builds/
