@@ -1,0 +1,71 @@
+name: Build Cribl Storage Tool
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Permission to request the JWT for OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.x'
+
+      - name: Install Dependencies
+        run: make deps
+
+      - name: Run Tests
+        run: make test
+
+      - name: Build Project
+        run: make build
+
+      - name: Upload build artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: cribl-storage-tool-binaries
+          path: build/
+          retention-days: 7
+
+      # Only deploy to S3 if this is a push to main/master
+      - name: Configure AWS credentials
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Generate version information
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          echo "version=${{ github.sha }}" > build/version.txt
+          echo "build_date=$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> build/version.txt
+          echo "commit=$(git rev-parse HEAD)" >> build/version.txt
+
+      - name: Deploy to S3
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          # Upload all built binaries to S3
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/cribl-storage-tool/${{ github.sha }}/ --acl public-read
+          
+          # Also upload to latest folder for easy access to most recent version
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/cribl-storage-tool/latest/ --acl public-read
+          
+          echo "::notice::Uploaded all files to S3 bucket"
+          echo "::notice::Main download directory: https://${{ secrets.S3_BUCKET }}.s3.amazonaws.com/cribl-storage-tool/latest/"
