@@ -1,9 +1,7 @@
 .PHONY: all deps test build clean
 
 # Go parameters
-GOBIN ?= $(GOPATH)/bin
 GO = go
-PLATFORMS = linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64 freebsd/amd64
 
 all: deps test build
 
@@ -17,23 +15,38 @@ test:
 build: clean
 	@mkdir -p build
 	@echo "Building for all platforms..."
-	@for platform in $(PLATFORMS); do \
-		GOOS=$$(echo $$platform | cut -d'/' -f1); \
-		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
-		mkdir -p build/$$GOOS-$$GOARCH; \
-		echo "Building for $$GOOS/$$GOARCH..."; \
-		if [ "$$GOOS" = "windows" ]; then \
-			GOOS=$$GOOS GOARCH=$$GOARCH $(GO) build -o build/$$GOOS-$$GOARCH/cribl-storage-tool.exe ./cmd/cribl-storage-tool; \
-		else \
-			GOOS=$$GOOS GOARCH=$$GOARCH $(GO) build -o build/$$GOOS-$$GOARCH/cribl-storage-tool ./cmd/cribl-storage-tool; \
-		fi; \
-		if [ $$? -eq 0 ]; then \
-			echo "✓ Successfully built for $$GOOS/$$GOARCH"; \
-		else \
-			echo "✗ Failed to build for $$GOOS/$$GOARCH"; \
-			exit 1; \
-		fi; \
-	done
+
+	@echo "Building for linux/amd64..."
+	@mkdir -p build/linux-amd64
+	@GOOS=linux GOARCH=amd64 $(GO) build -o build/linux-amd64/cribl-storage-tool .
+	@echo "✓ Successfully built for linux/amd64"
+
+	@echo "Building for linux/arm64..."
+	@mkdir -p build/linux-arm64
+	@GOOS=linux GOARCH=arm64 $(GO) build -o build/linux-arm64/cribl-storage-tool .
+	@echo "✓ Successfully built for linux/arm64"
+
+	@echo "Building for windows/amd64..."
+	@mkdir -p build/windows-amd64
+	@GOOS=windows GOARCH=amd64 $(GO) build -o build/windows-amd64/cribl-storage-tool.exe .
+	@echo "✓ Successfully built for windows/amd64"
+
+	@echo "Building for darwin/amd64..."
+	@mkdir -p build/darwin-amd64
+	@GOOS=darwin GOARCH=amd64 $(GO) build -o build/darwin-amd64/cribl-storage-tool .
+	@echo "✓ Successfully built for darwin/amd64"
+
+	@echo "Building for darwin/arm64..."
+	@mkdir -p build/darwin-arm64
+	@GOOS=darwin GOARCH=arm64 $(GO) build -o build/darwin-arm64/cribl-storage-tool .
+	@echo "✓ Successfully built for darwin/arm64"
+
+	@echo "Building for freebsd/amd64..."
+	@mkdir -p build/freebsd-amd64
+	@GOOS=freebsd GOARCH=amd64 $(GO) build -o build/freebsd-amd64/cribl-storage-tool .
+	@echo "✓ Successfully built for freebsd/amd64"
+
+	@echo "Build process completed!"
 
 clean:
 	@rm -rf build/
