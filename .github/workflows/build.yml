@@ -62,10 +62,10 @@ jobs:
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
           # Upload all built binaries to S3
-          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/cribl-storage-tool/${{ github.sha }}/ --acl public-read
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/cribl-storage-tool/${{ github.sha }}/
           
           # Also upload to latest folder for easy access to most recent version
-          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/cribl-storage-tool/latest/ --acl public-read
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/cribl-storage-tool/latest/
           
           echo "::notice::Uploaded all files to S3 bucket"
           echo "::notice::Main download directory: https://${{ secrets.S3_BUCKET }}.s3.amazonaws.com/cribl-storage-tool/latest/"
