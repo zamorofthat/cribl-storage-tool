@@ -1,0 +1,155 @@
+name: Build Cribl Storage Tool
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Define environment variables
+    env:
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      VERSION: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build for all platforms
+        run: |
+          # Create a directory for the builds
+          mkdir -p builds
+          
+          # Build for each platform (OS/architecture)
+          build_platform() {
+            platform=$1
+          
+            # Split the platform string into OS and architecture
+            GOOS=$(echo "$platform" | cut -d'/' -f1)
+            GOARCH=$(echo "$platform" | cut -d'/' -f2)
+          
+            # Create platform-specific directory
+            mkdir -p "builds/${GOOS}-${GOARCH}"
+          
+            # Set the output filename - same name for all platforms
+            if [ "$GOOS" = "windows" ]; then
+              output_name="builds/${GOOS}-${GOARCH}/cribl-storage-tool.exe"
+            else
+              output_name="builds/${GOOS}-${GOARCH}/cribl-storage-tool"
+            fi
+          
+            # Build the binary
+            echo "Building for $GOOS/$GOARCH..."
+            env GOOS=$GOOS GOARCH=$GOARCH go build -o "$output_name" ./...
+          
+            # Check if the build was successful
+            if [ $? -eq 0 ]; then
+              echo "::notice::Successfully built for $GOOS/$GOARCH"
+            else
+              echo "::error::Failed to build for $GOOS/$GOARCH"
+              exit 1
+            fi
+          }
+          
+          # Build for all platforms
+          build_platform "linux/amd64"
+          build_platform "linux/arm64"
+          build_platform "windows/amd64"
+          build_platform "darwin/amd64"
+          build_platform "darwin/arm64"
+          build_platform "freebsd/amd64"
+          
+          echo "Build process completed!"
+
+      - name: Upload build artifacts to GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: cribl-storage-tool-binaries
+          path: builds/
+          retention-days: 7
+
+      # Only upload to S3 if this is a push to main/master
+      - name: Configure AWS credentials
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Generate version information
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          echo "version=${{ env.VERSION }}" > builds/version.txt
+          echo "build_date=$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> builds/version.txt
+          echo "commit=$(git rev-parse HEAD)" >> builds/version.txt
+
+      - name: Upload binaries to S3
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          # Upload all built binaries to S3 with public read access
+          aws s3 sync builds/ s3://${{ env.S3_BUCKET }}/cribl-storage-tool/${{ env.VERSION }}/ --acl public-read
+          
+          # Also upload to latest folder for easy access to most recent version
+          aws s3 sync builds/ s3://${{ env.S3_BUCKET }}/cribl-storage-tool/latest/ --acl public-read
+          
+          # Generate download URLs for each binary
+          echo "::group::Download URLs"
+          echo "Download links for version ${{ env.VERSION }}:"
+          for file in builds/*; do
+            filename=$(basename "$file")
+            echo "https://${{ env.S3_BUCKET }}.s3.amazonaws.com/cribl-storage-tool/${{ env.VERSION }}/$filename"
+          done
+          echo "::endgroup::"
+          
+          # Generate a simple HTML index for the version
+          cat > builds/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Cribl Storage Tool Downloads</title>
+            <style>
+              body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+              h1 { color: #333; }
+              ul { list-style-type: none; padding: 0; }
+              li { margin: 10px 0; }
+              a { color: #0366d6; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+            </style>
+          </head>
+          <body>
+            <h1>Cribl Storage Tool Downloads</h1>
+            <p>Version: ${{ env.VERSION }}</p>
+            <p>Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')</p>
+            <h2>Download Links:</h2>
+            <ul>
+          EOF
+          
+          for file in builds/*; do
+            if [ -f "$file" ] && [ "$(basename "$file")" != "index.html" ]; then
+              filename=$(basename "$file")
+              echo "    <li><a href=\"$filename\">$filename</a></li>" >> builds/index.html
+            fi
+          done
+          
+          cat >> builds/index.html << EOF
+            </ul>
+          </body>
+          </html>
+          EOF
+          
+          # Upload the index file
+          aws s3 cp builds/index.html s3://${{ env.S3_BUCKET }}/cribl-storage-tool/${{ env.VERSION }}/index.html --acl public-read
+          aws s3 cp builds/index.html s3://${{ env.S3_BUCKET }}/cribl-storage-tool/latest/index.html --acl public-read
+          
+          echo "::notice::Uploaded all files to S3 bucket"
+          echo "::notice::Main download page: https://${{ env.S3_BUCKET }}.s3.amazonaws.com/cribl-storage-tool/latest/index.html"
