@@ -3,7 +3,7 @@ package cmd
 import (
     "encoding/json"
     "fmt"
-    "io/ioutil"
+//     "io/ioutil"
     "os"
     "strings"
 
@@ -137,7 +137,7 @@ var iamSetupCmd = &cobra.Command{
 
         // Handle bucket-file if provided
         if bucketFile != "" {
-            data, err := ioutil.ReadFile(bucketFile)
+            data, err := os.ReadFile(bucketFile)
             if err != nil {
                 logger.Fatal().Err(err).Str("file", bucketFile).Msg("error reading bucket file")
             }

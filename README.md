@@ -37,7 +37,10 @@ Managing data across multiple storage systems is increasingly complex. The cribl
 ## Installation
 
 Clone the repository and install the necessary dependencies:
-
+Run this command in your terminal and it will install the binary file
+```aiignore
+./scripts/install.sh
+```
 
 ## Usage
 
@@ -125,7 +128,6 @@ Listing S3 Buckets:
  - seclake-customsource
 
 ```
-
 ./cribl-storage-tool s3 list --profile goatshipansible --regex "lake.*"\
 ```aiignore
 zamorofthat@29JH7X-pi cribl-storage-tool % ./cribl-storage-tool s3 list --profile goatshipansible --regex "lake.*"
@@ -136,4 +138,14 @@ Listing S3 Buckets:
  - aws-security-data-lake-us-west-1-55555
  - aws-security-data-lake-us-west-2-55555
  - seclake-customsource
+```
+Create a bucket file to loop over in bash 
+```aiignore
+cribl-storage-tool s3 list -p goatshipansible -o names > goats.txt 
+badcoffee
+criblcoffeeroute53
+criblcompetitorsbucket
+kerno-samples-cdd9cc33-9d8c-442f-af10-6e07196e0d71
+seclake-customsource
+
 ```
