@@ -106,12 +106,12 @@ the workspace i'm going to link the bucket to is -w `contractors` .
 
 Since I like pi im going to specify my external-id with the flag -e `31415` + the role name -r `elbcoffeee` here is the completed command for badcoffee bucket:
 
-```./cribl-storage-tool iam setup --account 471112959014 --profile goatshipansible --bucket badcoffee -e 314515 -r elbcoffee --workspace contractors ```
+```./cribl-storage-tool iam setup --account 4711129531415 --profile goatshipansible --bucket badcoffee -e 314515 -r elbcoffee --workspace contractors ```
 
 you will see a stream of logs and if successful `{"level":"info","command":"iam_setup","time":"2025-02-27T13:48:26-05:00","message":"IAM trust relationship setup completed successfully"}`
 
 Speaking of stream lets go ahead and edit the command for stream to send data to the bucket from Stream:
-```./cribl-storage-tool iam setup --account 471112959014 --profile goatshipansible --bucket badcoffee -e 314515 -r elbcoffee --workspace contractors --workergroup default --action send```
+```./cribl-storage-tool iam setup --account 4711129531415 --profile goatshipansible --bucket badcoffee -e 314515 -r elbcoffee --workspace contractors --workergroup default --action send```
 
 - Using the filter || regex
 ```
