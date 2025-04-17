@@ -8,11 +8,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/spf13/cobra"
-	criblawshelper "github.com/zamorofthat/cribl-storage-tool/pkg/aws"
+	"context" // Ensure this line is present
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"context" // Ensure this line is present
+	"github.com/spf13/cobra"
+	criblawshelper "github.com/zamorofthat/cribl-storage-tool/pkg/aws"
 )
 
 // listCmd represents the list command
@@ -114,19 +115,19 @@ var listCmd = &cobra.Command{
 		}
 
 		// Format and print the output
-        switch outputFormat {
-        case "json":
-            err = s3Client.PrintBucketsJSON(buckets)
-            if err != nil {
-                log.Fatalf("Error printing buckets in JSON format: %v", err)
-            }
-        case "names":
-            s3Client.PrintBucketsNameOnly(buckets)
-        case "text":
-            fallthrough
-        default:
-            s3Client.PrintBucketsText(buckets)
-        }
+		switch outputFormat {
+		case "json":
+			err = s3Client.PrintBucketsJSON(buckets)
+			if err != nil {
+				log.Fatalf("Error printing buckets in JSON format: %v", err)
+			}
+		case "names":
+			s3Client.PrintBucketsNameOnly(buckets)
+		case "text":
+			fallthrough
+		default:
+			s3Client.PrintBucketsText(buckets)
+		}
 	},
 }
 
@@ -148,29 +149,54 @@ func loadAWSConfig(profile, region string) (aws.Config, error) {
 	return cfg, err
 }
 
-// loadBucketsFromFile reads a JSON file containing a list of bucket names
+// loadBucketsFromFile reads a file containing bucket names in either JSON or plain text format
 func loadBucketsFromFile(filePath string) ([]criblawshelper.Bucket, error) {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 
+	// Try to parse as JSON first
 	var bucketNames []string
-	err = json.Unmarshal(data, &bucketNames)
-	if err != nil {
-		return nil, err
+	jsonErr := json.Unmarshal(data, &bucketNames)
+	if jsonErr == nil {
+		// Successfully parsed as simple JSON array
+		var buckets []criblawshelper.Bucket
+		for _, name := range bucketNames {
+			buckets = append(buckets, criblawshelper.Bucket{Name: name})
+		}
+		return buckets, nil
 	}
 
+	// Try to parse as array of objects with name field
+	var bucketObjects []struct {
+		Name string `json:"name"`
+	}
+	jsonErr = json.Unmarshal(data, &bucketObjects)
+	if jsonErr == nil {
+		// Successfully parsed as array of objects
+		var buckets []criblawshelper.Bucket
+		for _, obj := range bucketObjects {
+			buckets = append(buckets, criblawshelper.Bucket{Name: obj.Name})
+		}
+		return buckets, nil
+	}
+
+	// If both JSON parsing attempts failed, try to parse as plain text (one bucket per line)
+	lines := strings.Split(string(data), "\n")
 	var buckets []criblawshelper.Bucket
-	for _, name := range bucketNames {
-		buckets = append(buckets, criblawshelper.Bucket{Name: name})
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			buckets = append(buckets, criblawshelper.Bucket{Name: line})
+		}
 	}
 	return buckets, nil
 }
 
 func init() {
 	// Define flags specific to the list command
-    listCmd.Flags().StringP("output", "o", "text", "Output format: text, json, or names")
+	listCmd.Flags().StringP("output", "o", "text", "Output format: text, json, or names")
 	listCmd.Flags().StringP("profile", "p", "", "AWS profile to use for authentication (optional)")
 	listCmd.Flags().StringP("region", "r", "", "AWS region to target (optional)")
 	listCmd.Flags().StringP("filter", "f", "", "Filter bucket names containing the specified substring (optional)")
